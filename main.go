@@ -15,7 +15,6 @@ import (
 	_ "github.com/lib/pq"
 )
 
-// Define el tipo Student
 type Student struct {
 	ID        int    `json:"id"`
 	Name      string `json:"name"`
@@ -59,7 +58,7 @@ func createStudent(w http.ResponseWriter, r *http.Request) {
 	var id int
 	err := conn.QueryRow(context.Background(), "INSERT INTO students (name, last_name, age, semestre) VALUES ($1, $2, $3, $4) RETURNING id_student", student.Name, student.Last_name, student.Age, student.Semestre).Scan(&id)
 	if err != nil {
-		http.Error(w, "Error creating student", http.StatusInternalServerError)
+		http.Error(w, "Error creando estudiante", http.StatusInternalServerError)
 		return
 	}
 
@@ -143,10 +142,9 @@ func main() {
 
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./dist")))
 
-	// Iniciar el servidor en el puerto 8080
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5000" // Usar el puerto 8080 si no se especifica otro
+		port = "5000"
 	}
 
 	fmt.Printf("Server is listening on port %s...\n", port)
