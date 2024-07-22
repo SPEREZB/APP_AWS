@@ -4,7 +4,6 @@ phases:
   install:
     runtime-versions:
       go: 1.22
-      nodejs: 14
     commands:
       - echo Installing Go dependencies...
       - go mod tidy
