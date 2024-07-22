@@ -68,15 +68,8 @@ func main() {
 		port = "5000"
 	}
 
-	// Obtener el host desde una variable de entorno, o usar el dominio por defecto
-	host := os.Getenv("HOST")
-	if host == "" {
-		host = "appgofinal-env.eba-r4upddvy.us-east-1.elasticbeanstalk.com"
-	}
-
-	// Construir la dirección de escucha
-	address := fmt.Sprintf("%s:%s", host, port)
-	log.Fatal(app.Listen(address))
+	// Iniciar el servidor en el puerto definido
+	log.Fatal(app.Listen(":" + port))
 }
 
 // Obtener todos los estudiantes
