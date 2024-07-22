@@ -20,8 +20,8 @@ phases:
 artifacts:
   files:
     - backend/.env 
-    - backend/main.go
     - backend/go.mod
     - backend/go.sum
+    - backend/main.go
   discard-paths: yes
   base-directory: backend
