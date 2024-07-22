@@ -7,19 +7,21 @@ phases:
       nodejs: 14
     commands:
       - echo Installing Go dependencies... 
+      - cd backend
       - go mod tidy
   build:
     commands:
       - echo Building the Go application... 
+      - cd backend
       - go build -o main .
   post_build:
     commands:
       - echo Build completed.
 artifacts:
   files:
-    - .env 
-    - go.mod
-    - go.sum
-    - main.go
+    - backend/.env 
+    - backend/go.mod
+    - backend/go.sum
+    - backend/main.go
   discard-paths: yes
   base-directory: .
