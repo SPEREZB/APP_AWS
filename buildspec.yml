@@ -17,9 +17,9 @@ phases:
       - echo Build completed.
 artifacts:
   files:
-    - backend/.env 
-    - backend/go.mod
-    - backend/go.sum
-    - backend/main.go
+    - .env 
+    - go.mod
+    - go.sum
+    - main.go
   discard-paths: yes
   base-directory: .
