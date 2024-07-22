@@ -155,10 +155,9 @@ func main() {
 
 	// Registrar los manejadores de cada endpoint
 	r.HandleFunc("/api/students", getStudents).Methods("GET")
-	r.HandleFunc("/api/students/{id:[0-9]+}", getStudentByID).Methods("GET")
-	r.HandleFunc("/api/students/create", createStudent).Methods("POST")
-	r.HandleFunc("/api/students/update/{id:[0-9]+}", updateStudent).Methods("PUT")
-	r.HandleFunc("/api/students/delete/{id:[0-9]+}", deleteStudent).Methods("DELETE")
+	r.HandleFunc("/api/students", createStudent).Methods("POST")
+	r.HandleFunc("/api/students/{id:[0-9]+}", updateStudent).Methods("PUT")
+	r.HandleFunc("/api/students/{id:[0-9]+}", deleteStudent).Methods("DELETE")
 
 	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./dist")))
 
