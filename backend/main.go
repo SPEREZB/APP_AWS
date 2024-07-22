@@ -69,7 +69,7 @@ func main() {
 	}
 
 	// Iniciar el servidor en el puerto definido
-	log.Fatal(app.Listen(":" + port))
+	log.Fatal(app.Listen("http://appgofinal-env.eba-r4upddvy.us-east-1.elasticbeanstalk.com:" + port))
 }
 
 // Obtener todos los estudiantes
