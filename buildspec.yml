@@ -24,4 +24,4 @@ artifacts:
     - backend/go.mod
     - backend/go.sum
   discard-paths: yes
-  base-directory: .
+  base-directory: backend
