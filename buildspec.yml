@@ -18,7 +18,8 @@ phases:
     commands:
       - echo Build completed.
 artifacts:
-  files: 
+  files:
+    - backend/main
     - backend/.env 
     - backend/main.go
     - backend/go.mod

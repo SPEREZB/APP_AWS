@@ -63,7 +63,13 @@ func main() {
 	app.Delete("/api/students/:id", deleteStudent)
 
 	// Iniciar el servidor en el puerto 3000
-	log.Fatal(app.Listen(":3000"))
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "5000"
+	}
+
+	// Iniciar el servidor en el puerto definido
+	log.Fatal(app.Listen(":" + port))
 }
 
 // Obtener todos los estudiantes
