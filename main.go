@@ -17,19 +17,19 @@ import (
 
 // Define el tipo Student
 type Student struct {
-	ID       int    `json:"id"`
-	Name     string `json:"name"`
-	Age      int    `json:"age"`
-	Semestre string `json:"semestre"`
+	ID        int    `json:"id"`
+	Name      string `json:"name"`
+	Last_name string `json:"last_name"`
+	Age       int    `json:"age"`
+	Semestre  string `json:"semestre"`
 }
 
 var conn *pgx.Conn
 
-// Obtener todos los estudiantes
 func getStudents(w http.ResponseWriter, r *http.Request) {
-	rows, err := conn.Query(context.Background(), "SELECT id_student, name, age, semestre FROM students")
+	rows, err := conn.Query(context.Background(), "SELECT id_student, name, last_name, age, semestre FROM students")
 	if err != nil {
-		http.Error(w, "Failed to query database", http.StatusInternalServerError)
+		http.Error(w, "Fallo al obtener el listado de estudiantes", http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
@@ -37,8 +37,8 @@ func getStudents(w http.ResponseWriter, r *http.Request) {
 	var students []Student
 	for rows.Next() {
 		var student Student
-		if err := rows.Scan(&student.ID, &student.Name, &student.Age, &student.Semestre); err != nil {
-			http.Error(w, "Failed to parse query result", http.StatusInternalServerError)
+		if err := rows.Scan(&student.ID, &student.Name, &student.Last_name, &student.Age, &student.Semestre); err != nil {
+			http.Error(w, "Fallo en el estado de la consulta", http.StatusInternalServerError)
 			return
 		}
 		students = append(students, student)
@@ -48,22 +48,6 @@ func getStudents(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(students)
 }
 
-// Obtener un estudiante por ID
-func getStudentByID(w http.ResponseWriter, r *http.Request) {
-	id := mux.Vars(r)["id"]
-	var student Student
-
-	err := conn.QueryRow(context.Background(), "SELECT id_student, name, age, semestre FROM students WHERE id_student=$1", id).Scan(&student.ID, &student.Name, &student.Age, &student.Semestre)
-	if err != nil {
-		http.Error(w, "Student not found", http.StatusNotFound)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(student)
-}
-
-// Crear un nuevo estudiante
 func createStudent(w http.ResponseWriter, r *http.Request) {
 	var student Student
 
@@ -73,7 +57,7 @@ func createStudent(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var id int
-	err := conn.QueryRow(context.Background(), "INSERT INTO students (name, age, semestre) VALUES ($1, $2, $3) RETURNING id_student", student.Name, student.Age, student.Semestre).Scan(&id)
+	err := conn.QueryRow(context.Background(), "INSERT INTO students (name, last_name, age, semestre) VALUES ($1, $2, $3, $4) RETURNING id_student", student.Name, student.Last_name, student.Age, student.Semestre).Scan(&id)
 	if err != nil {
 		http.Error(w, "Error creating student", http.StatusInternalServerError)
 		return
@@ -84,7 +68,6 @@ func createStudent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(student)
 }
 
-// Actualizar un estudiante
 func updateStudent(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 	var student Student
@@ -103,8 +86,8 @@ func updateStudent(w http.ResponseWriter, r *http.Request) {
 	student.ID = studentID
 
 	_, err = conn.Exec(context.Background(),
-		"UPDATE students SET name=$1, age=$2, semestre=$3 WHERE id_student=$4",
-		student.Name, student.Age, student.Semestre, student.ID)
+		"UPDATE students SET name=$1, age=$2, semestre=$3, last_name=$5 WHERE id_student=$4",
+		student.Name, student.Age, student.Semestre, student.ID, student.Last_name)
 	if err != nil {
 		http.Error(w, "Error updating student", http.StatusInternalServerError)
 		return
@@ -114,7 +97,6 @@ func updateStudent(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(student)
 }
 
-// Eliminar un estudiante
 func deleteStudent(w http.ResponseWriter, r *http.Request) {
 	id := mux.Vars(r)["id"]
 
