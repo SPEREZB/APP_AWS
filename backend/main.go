@@ -2,16 +2,17 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
 
-	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v5"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 )
 
 // Define el tipo Student
@@ -23,6 +24,108 @@ type Student struct {
 }
 
 var conn *pgx.Conn
+
+// Obtener todos los estudiantes
+func getStudents(w http.ResponseWriter, r *http.Request) {
+	rows, err := conn.Query(context.Background(), "SELECT id_student, name, age, semestre FROM students")
+	if err != nil {
+		http.Error(w, "Failed to query database", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var students []Student
+	for rows.Next() {
+		var student Student
+		if err := rows.Scan(&student.ID, &student.Name, &student.Age, &student.Semestre); err != nil {
+			http.Error(w, "Failed to parse query result", http.StatusInternalServerError)
+			return
+		}
+		students = append(students, student)
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(students)
+}
+
+// Obtener un estudiante por ID
+func getStudentByID(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var student Student
+
+	err := conn.QueryRow(context.Background(), "SELECT id_student, name, age, semestre FROM students WHERE id_student=$1", id).Scan(&student.ID, &student.Name, &student.Age, &student.Semestre)
+	if err != nil {
+		http.Error(w, "Student not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(student)
+}
+
+// Crear un nuevo estudiante
+func createStudent(w http.ResponseWriter, r *http.Request) {
+	var student Student
+
+	if err := json.NewDecoder(r.Body).Decode(&student); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	var id int
+	err := conn.QueryRow(context.Background(), "INSERT INTO students (name, age, semestre) VALUES ($1, $2, $3) RETURNING id_student", student.Name, student.Age, student.Semestre).Scan(&id)
+	if err != nil {
+		http.Error(w, "Error creating student", http.StatusInternalServerError)
+		return
+	}
+
+	student.ID = id
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(student)
+}
+
+// Actualizar un estudiante
+func updateStudent(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+	var student Student
+
+	if err := json.NewDecoder(r.Body).Decode(&student); err != nil {
+		http.Error(w, "Invalid request", http.StatusBadRequest)
+		return
+	}
+
+	studentID, err := strconv.Atoi(id)
+	if err != nil {
+		http.Error(w, "Invalid student ID", http.StatusBadRequest)
+		return
+	}
+
+	student.ID = studentID
+
+	_, err = conn.Exec(context.Background(),
+		"UPDATE students SET name=$1, age=$2, semestre=$3 WHERE id_student=$4",
+		student.Name, student.Age, student.Semestre, student.ID)
+	if err != nil {
+		http.Error(w, "Error updating student", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(student)
+}
+
+// Eliminar un estudiante
+func deleteStudent(w http.ResponseWriter, r *http.Request) {
+	id := mux.Vars(r)["id"]
+
+	result, err := conn.Exec(context.Background(), "DELETE FROM students WHERE id_student=$1", id)
+	if err != nil || result.RowsAffected() == 0 {
+		http.Error(w, "Error deleting student", http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
 
 func main() {
 	// Cargar variables de entorno desde el archivo .env
@@ -48,121 +151,23 @@ func main() {
 
 	fmt.Println("Connected to PostgreSQL database successfully!")
 
-	// Crear una nueva aplicación Fiber
-	app := fiber.New()
-	app.Use(logger.New())
+	r := mux.NewRouter()
 
-	// Servir archivos estáticos generados por React
-	app.Static("/", "./dist")
+	// Registrar los manejadores de cada endpoint
+	r.HandleFunc("/api/students", getStudents).Methods("GET")
+	r.HandleFunc("/api/students/{id:[0-9]+}", getStudentByID).Methods("GET")
+	r.HandleFunc("/api/students/create", createStudent).Methods("POST")
+	r.HandleFunc("/api/students/update/{id:[0-9]+}", updateStudent).Methods("PUT")
+	r.HandleFunc("/api/students/delete/{id:[0-9]+}", deleteStudent).Methods("DELETE")
 
-	// Definir rutas CRUD
-	app.Get("/api/students", getStudents)
-	app.Get("/api/students/:id", getStudentByID)
-	app.Post("/api/students", createStudent)
-	app.Put("/api/students/:id", updateStudent)
-	app.Delete("/api/students/:id", deleteStudent)
+	r.PathPrefix("/").Handler(http.FileServer(http.Dir("./dist")))
 
-	// Iniciar el servidor en el puerto 3000
+	// Iniciar el servidor en el puerto 8080
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "5000"
+		port = "5000" // Usar el puerto 8080 si no se especifica otro
 	}
 
-	// Iniciar el servidor en el puerto definido
-	log.Fatal(app.Listen(":" + port))
-}
-
-// Obtener todos los estudiantes
-func getStudents(c *fiber.Ctx) error {
-	var students []Student
-
-	rows, err := conn.Query(context.Background(), "SELECT id_student, name, age, semestre FROM students")
-	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to query database"})
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var student Student
-		if err := rows.Scan(&student.ID, &student.Name, &student.Age, &student.Semestre); err != nil {
-			return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Failed to parse query result"})
-		}
-		students = append(students, student)
-	}
-
-	return c.JSON(students)
-}
-
-// Obtener un estudiante por ID
-func getStudentByID(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var student Student
-
-	err := conn.QueryRow(context.Background(), "SELECT id, name, age, semestre FROM students WHERE id_student=$1", id).Scan(&student.ID, &student.Name, &student.Age, &student.Semestre)
-	if err != nil {
-		return c.Status(http.StatusNotFound).JSON(fiber.Map{"error": "estudiante no encontrado"})
-	}
-
-	return c.JSON(student)
-}
-
-// Crear un nuevo estudiante
-func createStudent(c *fiber.Ctx) error {
-	var student Student
-
-	if err := c.BodyParser(&student); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
-	}
-
-	var id int
-	err := conn.QueryRow(context.Background(), "INSERT INTO students (name, age, semestre) VALUES ($1, $2, $3) RETURNING id_student", student.Name, student.Age, student.Semestre).Scan(&id)
-	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Error al crear estudiante"})
-	}
-
-	student.ID = id
-	return c.JSON(student)
-}
-
-// Actualizar un estudiante
-func updateStudent(c *fiber.Ctx) error {
-	id := c.Params("id")
-	var student Student
-
-	// Parsear el cuerpo de la solicitud
-	if err := c.BodyParser(&student); err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid request"})
-	}
-
-	// Convertir el ID de la URL a un entero
-	studentID, err := strconv.Atoi(id)
-	if err != nil {
-		return c.Status(http.StatusBadRequest).JSON(fiber.Map{"error": "Invalid student ID"})
-	}
-
-	// Establecer el ID del estudiante para la actualización
-	student.ID = studentID
-
-	// Ejecutar la consulta de actualización en la base de datos
-	_, err = conn.Exec(context.Background(),
-		"UPDATE students SET name=$1, age=$2, semestre=$3 WHERE id_student=$4",
-		student.Name, student.Age, student.Semestre, student.ID)
-	if err != nil {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Error al actualizar estudiante"})
-	}
-
-	// Devolver la respuesta con el estudiante actualizado
-	return c.JSON(student)
-}
-
-// Eliminar un estudiante
-func deleteStudent(c *fiber.Ctx) error {
-	id := c.Params("id")
-
-	result, err := conn.Exec(context.Background(), "DELETE FROM students WHERE id_student=$1", id)
-	if err != nil || result.RowsAffected() == 0 {
-		return c.Status(http.StatusInternalServerError).JSON(fiber.Map{"error": "Error al borrar estudiante"})
-	}
-
-	return c.SendStatus(http.StatusNoContent)
+	fmt.Printf("Server is listening on port %s...\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, r))
 }
